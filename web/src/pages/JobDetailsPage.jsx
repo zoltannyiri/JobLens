@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  Link,
-  useParams,
-} from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
-import { getJobByIdRequest } from "../api/jobsApi";
+import { getJobByIdRequest, getJobMatchRequest } from "../api/jobsApi";
 
 function formatDate(value) {
   if (!value) {
@@ -24,16 +21,37 @@ function JobDetailsPage() {
   const [job, setJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [match, setMatch] = useState(null);
+  const [matchError, setMatchError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadJob() {
       try {
-        const result = await getJobByIdRequest(jobId);
+        const [jobResult, matchResult] =
+          await Promise.allSettled([
+            getJobByIdRequest(jobId),
+            getJobMatchRequest(jobId),
+          ]);
 
-        if (isMounted) {
-          setJob(result);
+        if (!isMounted) {
+          return;
+        }
+
+        if (jobResult.status === "rejected") {
+          throw jobResult.reason;
+        }
+
+        setJob(jobResult.value);
+
+        if (matchResult.status === "fulfilled") {
+          setMatch(matchResult.value);
+        } else {
+          setMatchError(
+            matchResult.reason.response?.data?.message ||
+              "A személyre szabott elemzés nem érhető el."
+          );
         }
       } catch (requestError) {
         if (isMounted) {
@@ -120,6 +138,106 @@ function JobDetailsPage() {
       </header>
 
       <section className="mx-auto w-full max-w-5xl px-6 py-10">
+        {match && (
+          <section
+            className={`mb-6 rounded-3xl border p-6 shadow-sm ${
+              match.isExcluded
+                ? "border-red-200 bg-red-50"
+                : "border-blue-200 bg-white"
+            }`}
+          >
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
+              <div>
+                <p
+                  className={`text-xs font-black tracking-[0.16em] uppercase ${
+                    match.isExcluded
+                      ? "text-red-700"
+                      : "text-blue-600"
+                  }`}
+                >
+                  Személyre szabott elemzés
+                </p>
+
+                <h2 className="mt-2 text-xl font-black text-slate-950">
+                  {match.isExcluded
+                    ? "Ez az állás kizárt találat"
+                    : "Miért lehet megfelelő számodra?"}
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  A pontszámot a keresési profilod alapján
+                  számítottuk ki.
+                </p>
+              </div>
+
+              <div
+                className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-xl font-black ${
+                  match.isExcluded
+                    ? "bg-red-100 text-red-800"
+                    : match.matchPercentage >= 80
+                      ? "bg-emerald-100 text-emerald-800"
+                      : match.matchPercentage >= 60
+                        ? "bg-blue-100 text-blue-800"
+                        : match.matchPercentage >= 40
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {match.matchPercentage}%
+              </div>
+            </div>
+
+            {!match.isExcluded &&
+              match.matchedReasons?.length > 0 && (
+                <ul className="mt-6 grid gap-3 md:grid-cols-2">
+                  {match.matchedReasons.map((reason) => (
+                    <li
+                      key={reason}
+                      className="flex gap-3 rounded-xl bg-blue-50 px-4 py-3 text-sm text-slate-700"
+                    >
+                      <span className="font-black text-blue-600">
+                        ✓
+                      </span>
+
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+            {match.isExcluded &&
+              match.excludedReasons?.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-sm font-bold text-red-800">
+                    Kizárást okozó kulcsszavak:
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {match.excludedReasons.map((reason) => (
+                      <span
+                        key={reason}
+                        className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800"
+                      >
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+          </section>
+        )}
+        {matchError && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            {matchError}
+
+            <Link
+              to="/search-profile"
+              className="ml-1 font-bold underline"
+            >
+              Keresési profil beállítása
+            </Link>
+          </div>
+        )}
         <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <header className="border-b border-slate-200 p-8">
             <div className="flex flex-wrap gap-2">

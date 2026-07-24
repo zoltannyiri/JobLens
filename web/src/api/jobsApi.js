@@ -16,6 +16,12 @@ export async function getMatchedJobsRequest(params = {}) {
   return response.data.data;
 }
 
+export async function getJobMatchRequest(jobId) {
+  const response = await apiClient.get(`/jobs/${jobId}/match`);
+
+  return response.data.data.match;
+}
+
 export async function getJobByIdRequest(jobId) {
   const response = await apiClient.get(`/jobs/${jobId}`);
 

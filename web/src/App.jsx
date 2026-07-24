@@ -7,7 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import SearchProfilePage from "./pages/SearchProfilePage";
-import JobDetailsPage from "./pages/JobsDetailsPage";
+import JobDetailsPage from "./pages/JobDetailsPage";
 import JobsPage from "./pages/JobsPage";
 
 function App() {
