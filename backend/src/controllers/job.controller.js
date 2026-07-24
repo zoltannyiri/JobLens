@@ -159,8 +159,37 @@ async function getJobById(req, res, next) {
   }
 }
 
+async function getMatchedJobs(req, res, next) {
+  try {
+    const userId = req.user.id;
+
+    const result = await jobService.getMatchedJobs(
+      userId,
+      req.query
+    );
+
+    if (result.profileMissing) {
+      return res.status(404).json({
+        success: false,
+        message: "A személyre szabott találatokhoz előbb hozz létre keresési profilt.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        jobs: result.jobs,
+        pagination: result.pagination,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getJobs,
   getJobById,
   createJob,
+  getMatchedJobs,
 };

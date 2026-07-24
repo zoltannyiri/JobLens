@@ -7,8 +7,9 @@ const router = express.Router();
 
 router.use(authenticate);
 
+router.post("/", jobController.createJob);
+router.get("/matched", jobController.getMatchedJobs);
 router.get("/", jobController.getJobs);
 router.get("/:id", jobController.getJobById);
-router.post("/", jobController.createJob);
 
 module.exports = router;
