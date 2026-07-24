@@ -11,6 +11,33 @@ enum UserRole {
   ADMIN
 }
 
+model SearchProfile {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique
+
+  positionTitle        String
+  seniority            String?
+  experienceMin        Int?
+  experienceMax        Int?
+
+  locations            String[]
+  remoteOnly           Boolean  @default(false)
+
+  technologies         String[]
+  includedKeywords     String[]
+  excludedKeywords     String[]
+
+  notificationsEnabled Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([seniority])
+}
+
 model User {
   id              Int       @id @default(autoincrement())
   name            String
@@ -21,6 +48,7 @@ model User {
   emailVerifiedAt DateTime?
 
   sessions Session[]
+  searchProfile   SearchProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
