@@ -7,6 +7,8 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import SearchProfilePage from "./pages/SearchProfilePage";
+import JobDetailsPage from "./pages/JobsDetailsPage";
+import JobsPage from "./pages/JobsPage";
 
 function App() {
   return (
@@ -19,6 +21,8 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/search-profile" element={<SearchProfilePage />} />
+        <Route path="/jobs" element={<JobsPage />} />
+        <Route path="/jobs/:jobId" element={<JobDetailsPage />} />
       </Route>
 
       <Route path="/" element={
