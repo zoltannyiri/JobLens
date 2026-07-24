@@ -187,9 +187,53 @@ async function getMatchedJobs(req, res, next) {
   }
 }
 
+async function getJobMatch(req, res, next) {
+  try {
+    const jobId = Number(req.params.id);
+
+    if (!Number.isInteger(jobId) || jobId < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Érvénytelen állásazonosító.",
+      });
+    }
+
+    const userId = req.user.id;
+
+    const result = await jobService.getJobMatchForUser(
+      jobId,
+      userId
+    );
+
+    if (result.jobMissing) {
+      return res.status(404).json({
+        success: false,
+        message: "Az álláshirdetés nem található.",
+      });
+    }
+
+    if (result.profileMissing) {
+      return res.status(404).json({
+        success: false,
+        message: "A személyre szabott elemzéshez előbb hozz létre keresési profilt.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        match: result.match,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getJobs,
   getJobById,
   createJob,
   getMatchedJobs,
+  getJobMatch,
 };

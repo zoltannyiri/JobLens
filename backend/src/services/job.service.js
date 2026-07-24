@@ -281,6 +281,63 @@ async function getMatchedJobs(userId, query) {
   }
 }
 
+async function getJobMatchForUser(jobId, userId) {
+  const [job, profile] = await Promise.all([
+    prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+      select: {
+        id: true,
+        title: true,
+        company: true,
+        location: true,
+        description: true,
+        experienceMin: true,
+        experienceMax: true,
+        seniority: true,
+        roleType: true,
+        remoteType: true,
+      },
+    }),
+
+    prisma.searchProfile.findUnique({
+      where: {
+        userId,
+      },
+    }),
+  ]);
+
+  if (!job) {
+    return {
+      jobMissing: true,
+      profileMissing: false,
+      match: null,
+    };
+  }
+
+  if (!profile) {
+    return {
+      jobMissing: false,
+      profileMissing: true,
+      match: null,
+    };
+  }
+
+  const match = calculateJobMatch(job, profile);
+
+  return {
+    jobMissing: false,
+    profileMissing: false,
+    match: {
+      matchPercentage: match.matchPercentage,
+      matchedReasons: match.matchedReasons,
+      excludedReasons: match.excludedReasons,
+      isExcluded: match.isExcluded,
+    },
+  };
+}
+
 function buildJobWhere(query) {
   const { search, source, seniority, roleType, remoteType } = query;
   const where = {};
@@ -461,4 +518,5 @@ module.exports = {
   getJobById,
   createJob,
   getMatchedJobs,
+  getJobMatchForUser,
 };
