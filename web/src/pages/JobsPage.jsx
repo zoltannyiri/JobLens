@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { getJobsRequest } from "../api/jobsApi";
+import { getJobsRequest, getMatchedJobsRequest } from "../api/jobsApi";
 
 const initialFilters = {
   search: "",
@@ -59,6 +59,9 @@ function JobsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [viewMode, setViewMode] = useState("matched");
+  const [minimumMatch, setMinimumMatch] = useState(20);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -67,11 +70,24 @@ function JobsPage() {
       setError("");
 
       try {
-        const result = await getJobsRequest({
-          ...submittedFilters,
+        const params = {
           page: pagination.page,
           limit: pagination.limit,
-        });
+        };
+
+        let result;
+
+        if (viewMode === "matched") {
+          result = await getMatchedJobsRequest({
+            ...params,
+            minimumMatch,
+          });
+        } else {
+          result = await getJobsRequest({
+            ...submittedFilters,
+            ...params,
+          });
+        }
 
         if (!isMounted) {
           return;
@@ -101,11 +117,7 @@ function JobsPage() {
     return () => {
       isMounted = false;
     };
-  }, [
-    submittedFilters,
-    pagination.page,
-    pagination.limit,
-  ]);
+  }, [ submittedFilters, pagination.page, pagination.limit, viewMode, minimumMatch ]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -208,6 +220,47 @@ function JobsPage() {
           </p>
         </div>
 
+        <div className="mb-6 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("matched");
+
+              setPagination((current) => ({
+                ...current,
+                page: 1,
+              }));
+            }}
+            className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${
+              viewMode === "matched"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Neked ajánlott
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("all");
+
+              setPagination((current) => ({
+                ...current,
+                page: 1,
+              }));
+            }}
+            className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${
+              viewMode === "all"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Minden állás
+          </button>
+        </div>
+
+        {viewMode === "all" && (
         <form
           onSubmit={handleSubmit}
           className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -284,10 +337,55 @@ function JobsPage() {
             </button>
           </div>
         </form>
+        )}
+
+        {viewMode === "matched" && (
+          <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="font-black text-slate-900">
+                  Személyre szabott találatok
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Az állásokat a keresési profilod alapján
+                  rangsoroljuk.
+                </p>
+              </div>
+
+              <label className="block sm:w-56">
+                <span className="mb-2 block text-sm font-bold text-slate-700">
+                  Minimum egyezés
+                </span>
+
+                <select
+                  value={minimumMatch}
+                  onChange={(event) => {
+                    setMinimumMatch(Number(event.target.value));
+
+                    setPagination((current) => ({
+                      ...current,
+                      page: 1,
+                    }));
+                  }}
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                >
+                  <option value={0}>Minden találat</option>
+                  <option value={20}>Legalább 20%</option>
+                  <option value={40}>Legalább 40%</option>
+                  <option value={60}>Legalább 60%</option>
+                  <option value={80}>Legalább 80%</option>
+                </select>
+              </label>
+            </div>
+          </section>
+        )}
 
         <div className="mb-5 flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            Összes találat:{" "}
+            {viewMode === "matched"
+              ? "Személyre szabott találatok:"
+              : "Összes találat:"}{" "}
             <strong className="text-slate-900">
               {pagination.total}
             </strong>
@@ -330,6 +428,21 @@ function JobsPage() {
                 <div className="flex flex-col justify-between gap-5 md:flex-row">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      {typeof job.matchPercentage === "number" && (
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${
+                            job.matchPercentage >= 80
+                              ? "bg-emerald-100 text-emerald-800"
+                              : job.matchPercentage >= 60
+                                ? "bg-blue-100 text-blue-800"
+                                : job.matchPercentage >= 40
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {job.matchPercentage}% egyezés
+                        </span>
+                      )}
                       {job.seniority && (
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                           {getSeniorityLabel(job.seniority)}
@@ -383,6 +496,29 @@ function JobsPage() {
                         </span>
                       )}
                     </div>
+
+                    {job.matchedReasons?.length > 0 && (
+                      <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                        <p className="text-xs font-black tracking-wide text-blue-700 uppercase">
+                          Miért ajánljuk?
+                        </p>
+
+                        <ul className="mt-3 space-y-2">
+                          {job.matchedReasons.map((reason) => (
+                            <li
+                              key={reason}
+                              className="flex gap-2 text-sm text-slate-700"
+                            >
+                              <span className="font-black text-blue-600">
+                                ✓
+                              </span>
+
+                              <span>{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <p className="mt-4 text-xs font-semibold tracking-wide text-slate-400 uppercase">
                       Forrás: {job.source}

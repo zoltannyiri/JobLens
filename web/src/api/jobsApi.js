@@ -8,6 +8,14 @@ export async function getJobsRequest(params = {}) {
   return response.data.data;
 }
 
+export async function getMatchedJobsRequest(params = {}) {
+  const response = await apiClient.get("/jobs/matched", {
+    params,
+  });
+
+  return response.data.data;
+}
+
 export async function getJobByIdRequest(jobId) {
   const response = await apiClient.get(`/jobs/${jobId}`);
 
