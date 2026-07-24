@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { getJobByIdRequest, getJobMatchRequest } from "../api/jobsApi";
+import { getSavedJobStatusRequest, saveJobRequest, unsaveJobRequest } from "../api/savedJobsApi";
 
 function formatDate(value) {
   if (!value) {
@@ -23,21 +24,37 @@ function JobDetailsPage() {
   const [error, setError] = useState("");
   const [match, setMatch] = useState(null);
   const [matchError, setMatchError] = useState("");
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaveLoading, setIsSaveLoading] = useState(true);
+  const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadJob() {
       try {
-        const [jobResult, matchResult] =
+        const [jobResult, matchResult, savedStatusResult] =
           await Promise.allSettled([
             getJobByIdRequest(jobId),
             getJobMatchRequest(jobId),
+            getSavedJobStatusRequest(jobId),
           ]);
 
         if (!isMounted) {
           return;
         }
+
+        if (savedStatusResult.status === "fulfilled") {
+          setIsSaved(savedStatusResult.value.isSaved);
+        } else {
+          setSaveError(
+            savedStatusResult.reason.response?.data?.message ||
+              "Nem sikerült lekérni a mentési állapotot."
+          );
+        }
+
+        setIsSaveLoading(false);
 
         if (jobResult.status === "rejected") {
           throw jobResult.reason;
@@ -63,6 +80,7 @@ function JobDetailsPage() {
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          setIsSaveLoading(false);
         }
       }
     }
@@ -73,6 +91,28 @@ function JobDetailsPage() {
       isMounted = false;
     };
   }, [jobId]);
+
+  async function handleSavedToggle() {
+    setSaveError("");
+    setIsSaveSubmitting(true);
+
+    try {
+      if (isSaved) {
+        await unsaveJobRequest(jobId);
+        setIsSaved(false);
+      } else {
+        await saveJobRequest(jobId);
+        setIsSaved(true);
+      }
+    } catch (requestError) {
+      setSaveError(
+        requestError.response?.data?.message ||
+          "Nem sikerült módosítani a mentési állapotot."
+      );
+    } finally {
+      setIsSaveSubmitting(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -305,6 +345,11 @@ function JobDetailsPage() {
             </section>
 
             <aside className="h-fit rounded-2xl bg-slate-50 p-5">
+              {saveError && (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  {saveError}
+                </div>
+              )}
               <h2 className="font-black text-slate-900">
                 Részletek
               </h2>
@@ -344,6 +389,25 @@ function JobDetailsPage() {
                   </dd>
                 </div>
               </dl>
+
+              <button
+                type="button"
+                onClick={handleSavedToggle}
+                disabled={isSaveLoading || isSaveSubmitting}
+                className={`mt-6 block w-full rounded-xl border px-5 py-3 text-center text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${
+                  isSaved
+                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                    : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+                }`}
+              >
+                {isSaveLoading
+                  ? "Betöltés..."
+                  : isSaveSubmitting
+                    ? "Mentés..."
+                    : isSaved
+                      ? "Eltávolítás a mentésekből"
+                      : "Állás mentése"}
+              </button>
 
               <a
                 href={job.url}

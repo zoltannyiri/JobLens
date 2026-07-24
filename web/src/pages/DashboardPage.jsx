@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getJobsRequest } from "../api/jobsApi";
 import { getSearchProfileRequest } from "../api/searchProfileApi";
+import { getSavedJobsRequest } from "../api/savedJobsApi";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -15,6 +16,9 @@ function DashboardPage() {
   const [jobCount, setJobCount] = useState(0);
   const [isJobsLoading, setIsJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState("");
+  const [savedJobCount, setSavedJobCount] = useState(0);
+  const [isSavedJobsLoading, setIsSavedJobsLoading] = useState(true);
+  const [savedJobsError, setSavedJobsError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -67,8 +71,33 @@ function DashboardPage() {
       }
     }
 
+    async function loadSavedJobs() {
+      try {
+        const result = await getSavedJobsRequest({
+          page: 1,
+          limit: 1,
+        });
+
+        if (isMounted) {
+          setSavedJobCount(result.pagination.total)
+        }
+      } catch (error) {
+        if (isMounted) {
+          setSavedJobsError(
+            error.response?.data?.message ||
+              "Nem sikerült betölteni az elmentett állások számát."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsSavedJobsLoading(false);
+        }
+      }
+    }
+
     loadSearchProfile();
     loadJobs();
+    loadSavedJobs();
 
     return () => {
       isMounted = false;
@@ -157,6 +186,12 @@ function DashboardPage() {
           </div>
         )}
 
+        {savedJobsError && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
+            {savedJobsError}
+          </div>
+        )}
+
         <div className="grid gap-6 md:grid-cols-3">
           <Link
             to="/jobs"
@@ -185,19 +220,32 @@ function DashboardPage() {
             </p>
           </Link>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Link
+            to="/saved-jobs"
+            className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+          >
             <p className="text-sm font-semibold text-slate-500">
               Mentett állások
             </p>
 
-            <p className="mt-3 text-4xl font-black text-slate-950">
-              0
-            </p>
+            {isSavedJobsLoading ? (
+              <div className="mt-5 flex items-center gap-3">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
 
-            <p className="mt-2 text-sm text-slate-500">
-              Itt jelennek majd meg az elmentett pozíciók.
+                <span className="text-sm text-slate-500">
+                  Betöltés...
+                </span>
+              </div>
+            ) : (
+              <p className="mt-3 text-4xl font-black text-slate-950">
+                {savedJobCount}
+              </p>
+            )}
+
+            <p className="mt-2 text-sm font-semibold text-blue-600 transition group-hover:text-blue-700">
+              Mentések megtekintése →
             </p>
-          </article>
+          </Link>
 
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">

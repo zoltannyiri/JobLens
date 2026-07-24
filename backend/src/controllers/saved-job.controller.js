@@ -1,6 +1,6 @@
 const savedJobService = require('../services/saved-job.service');
 
-function parceJobId(value) {
+function parseJobId(value) {
   const jobId = Number(value);
 
   if (!Number.isInteger(jobId) || jobId < 1) {
@@ -12,7 +12,7 @@ function parceJobId(value) {
 
 async function saveJob(req, res, next) {
   try {
-    const jobId = parceJobId(req.params.jobId);
+    const jobId = parseJobId(req.params.jobId);
 
     if (!jobId) {
       return res.status(400).json({

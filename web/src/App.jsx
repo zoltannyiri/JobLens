@@ -9,6 +9,7 @@ import RegisterPage from "./pages/RegisterPage";
 import SearchProfilePage from "./pages/SearchProfilePage";
 import JobDetailsPage from "./pages/JobDetailsPage";
 import JobsPage from "./pages/JobsPage";
+import SavedJobsPage from "./pages/SavedJobsPage";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/search-profile" element={<SearchProfilePage />} />
         <Route path="/jobs" element={<JobsPage />} />
         <Route path="/jobs/:jobId" element={<JobDetailsPage />} />
+        <Route path="/saved-jobs" element={<SavedJobsPage />} />
       </Route>
 
       <Route path="/" element={
