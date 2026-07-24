@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/auth.route");
 const searchProfileRoutes = require("./routes/searchProfile.routes");
+const jobRoutes = require("./routes/job.routes");
 const { notFoundHandler, errorHandler } = require("./middlewares/error.middleware");
 
 const app = express();
@@ -41,6 +42,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/search-profile", searchProfileRoutes);
+app.use("/api/jobs", jobRoutes);
 
 app.use(notFoundHandler)
 app.use(errorHandler)
