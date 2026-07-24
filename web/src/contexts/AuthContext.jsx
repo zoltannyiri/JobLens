@@ -1,25 +1,45 @@
-import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { loginRequest, logoutRequest, getCurrentUserRequest, registerRequest } from "../api/authApi";
 import { restoreSession } from "../api/apiClient";
-import { loginRequest, logoutRequest, registerRequest } from "../api/authApi";
+import { clearAccessToken, setAccessToken } from "../api/tokenStore"
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] =
+    useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     async function initializeAuth() {
-      const restoredUser = await restoreSession();
+      try {
+        const accessToken = await restoreSession();
 
-      if (isMounted) {
-        setUser(restoredUser);
-        setIsInitializing(false);
+        if (!accessToken) {
+          return;
+        }
+
+        const currentUser =
+          await getCurrentUserRequest();
+
+        if (isMounted) {
+          setUser(currentUser);
+        }
+      } catch {
+        clearAccessToken();
+
+        if (isMounted) {
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
     }
-    
+
     initializeAuth();
 
     return () => {
@@ -27,35 +47,44 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = useCallback(async (credentials) => {
-    const loggedInUser = await loginRequest(credentials);
+  async function login(credentials) {
+    const loggedInUser =
+      await loginRequest(credentials);
 
     setUser(loggedInUser);
 
     return loggedInUser;
-  }, []);
+  }
 
-  const register = useCallback(async (data) => {
-    const registeredUser = await registerRequest(data);
+  async function register(data) {
+    const registeredUser =
+      await registerRequest(data);
 
     setUser(registeredUser);
 
     return registeredUser;
-  }, []);
+  }
 
-  const logout = useCallback(async () => {
-    await logoutRequest();
-    setUser(null);
-  }, []);
+  async function logout() {
+    try {
+      await logoutRequest();
+    } finally {
+      clearAccessToken();
+      setUser(null);
+    }
+  }
 
-  const value = useMemo(() => ({
-    user,
-    isAuthenticated: Boolean(user),
-    isInitializing,
-    login,
-    register,
-    logout,
-  }), [user, isInitializing, login, register, logout]);
+  const value = useMemo(
+    () => ({
+      user,
+      isAuthenticated: Boolean(user),
+      isInitializing,
+      login,
+      register,
+      logout,
+    }),
+    [user, isInitializing]
+  );
 
   return (
     <AuthContext.Provider value={value}>
@@ -68,8 +97,12 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("A useAuth csak AuthProvideren belül használható.");
+    throw new Error(
+      "A useAuth csak AuthProvideren belül használható."
+    );
   }
 
   return context;
 }
+
+export default AuthContext;
