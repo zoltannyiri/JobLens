@@ -1,0 +1,2 @@
+prisma: npx prisma studio
+backend: npm start
