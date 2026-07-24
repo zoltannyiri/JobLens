@@ -49,6 +49,7 @@ model User {
 
   sessions Session[]
   searchProfile   SearchProfile?
+  savedJobs       SavedJob[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -86,6 +87,8 @@ model Job {
 
   rawData Json?
 
+  savedBy       SavedJob[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -96,4 +99,19 @@ model Job {
   @@index([publishedAt])
   @@index([seniority])
   @@index([roleType])
+}
+
+model SavedJob {
+  id     Int @id @default(autoincrement())
+  userId Int
+  jobId  Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
 }
