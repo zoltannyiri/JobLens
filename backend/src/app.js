@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth.route");
 const searchProfileRoutes = require("./routes/searchProfile.routes");
 const jobRoutes = require("./routes/job.routes");
 const savedJobRoutes = require("./routes/saved-job.routes");
+const jobImportRoutes = require("./routes/job-import.routes");
 const { notFoundHandler, errorHandler } = require("./middlewares/error.middleware");
 
 const app = express();
@@ -45,6 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/search-profile", searchProfileRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/saved-jobs", savedJobRoutes);
+app.use("/api/job-import", jobImportRoutes);
 
 app.use(notFoundHandler)
 app.use(errorHandler)
