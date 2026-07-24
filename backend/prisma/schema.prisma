@@ -1,11 +1,42 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../generated/prisma"
-  moduleFormat = "cjs"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  role            UserRole  @default(USER)
+  isActive        Boolean   @default(true)
+  emailVerifiedAt DateTime?
+
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Job {
