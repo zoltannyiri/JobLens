@@ -1,7 +1,8 @@
 const prisma = require("../config/prisma");
 const { searchJoobleJobs } = require("../providers/jobble.provider");
+const { searchCareerjetJobs } = require("../providers/careerjet.provider");
 
-function normalizeTextt(value) {
+function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -87,6 +88,108 @@ function mapJoobleJob(job) {
     roleType: null,
     remoteType: inferRemoteType(job),
     rawData: job,
+  };
+}
+
+function mapCareerjetJob(job) {
+  const url = normalizeText(job.url);
+
+  return {
+    source: "careerjet",
+    externalId: url || null,
+    title: normalizeText(job.title) || "Ismeretlen pozíció",
+    company: normalizeText(job.company) || null,
+    location: normalizeText(job.locations) || null,
+    description: normalizeText(job.description) || null,
+    url,
+    publishedAt: parsePublishedAt(job.date),
+    experienceMin: null,
+    experienceMax: null,
+    seniority: null,
+    roleType: null,
+    remoteType: inferRemoteType({
+      title: job.title,
+      location: job.locations,
+      snippet: job.description,
+      type: null,
+    }),
+    rawData: job,
+  };
+}
+
+async function importCareerjetJobs({
+  keywords,
+  location = "Magyarország",
+  page = 1,
+  pageSize = 20,
+  userIp,
+  userAgent,
+}) {
+  const careerjetResponse = await searchCareerjetJobs({
+    keywords,
+    location,
+    page,
+    pageSize,
+    userIp,
+    userAgent,
+  });
+
+  if (careerjetResponse.type === "LOCATIONS") {
+    return {
+      sourceTotal: 0,
+      statistics: {
+        received: 0,
+        accepted: 0,
+        skipped: 0,
+        updated: 0,
+        created: 0,
+      },
+      locationChoices: careerjetResponse.locations || [],
+      message: careerjetResponse.message,
+      jobs: [],
+    };
+  }
+
+  const sourceJobs = Array.isArray(careerjetResponse.jobs) ? careerjetResponse.jobs : [];
+
+  const statistics = {
+    received: sourceJobs.length,
+    accepted: 0,
+    skipped: 0,
+    updated: 0,
+    created: 0,
+  };
+
+  const importedJobs = [];
+
+  for (const sourceJob of sourceJobs) {
+    const mappedJob = mapCareerjetJob(sourceJob);
+
+    if (!mappedJob.url) {
+      statistics.skipped += 1;
+      continue;
+    }
+
+    statistics.accepted += 1;
+
+    const result = await upsertImportedJob(mappedJob);
+
+    if (result.status === "created") {
+      statistics.created += 1;
+      importedJobs.push(result.job);
+    } else if (result.status === "updated") {
+      statistics.updated += 1;
+      importedJobs.push(result.job);
+    } else {
+      statistics.skipped += 1;
+    }
+  }
+
+  return {
+    sourceTotal: Number.isFinite(Number(careerjetResponse.hits)) ? Number(careerjetResponse.hits) : 0,
+    pages: careerjetResponse.pages || 0,
+    statistics,
+    jobs: importedJobs,
   };
 }
 
@@ -200,4 +303,5 @@ async function importJoobleJobs({
 
 module.exports = {
   importJoobleJobs,
+  importCareerjetJobs,
 };

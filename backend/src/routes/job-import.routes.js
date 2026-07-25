@@ -6,5 +6,6 @@ const router = express.Router();
 router.use(authenticate);
 
 router.post("/jooble", jobImportController.importJoobleJobs);
+router.post("/careerjet", jobImportController.importCareerjetJobs);
 
 module.exports = router;
