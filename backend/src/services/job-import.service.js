@@ -2,6 +2,95 @@ const prisma = require("../config/prisma");
 const { searchJoobleJobs } = require("../providers/jobble.provider");
 const { searchCareerjetJobs } = require("../providers/careerjet.provider");
 
+function stripHtml(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inferSeniority(title, description) {
+  const text = `${title} ${description}`.toLowerCase();
+
+  if (text.includes("intern") || text.includes("gyakornok") || text.includes("trainee")) {
+    return "INTERN";
+  }
+
+  if (text.includes("junior") || text.includes("pályakezdő") || text.includes("entry level")) {
+    return "JUNIOR";
+  }
+
+  if (text.includes("senior") || text.includes("lead") || text.includes("principal") || text.includes("architect")) {
+    return "SENIOR";
+  }
+
+  if (text.includes("middle") || text.includes("mid-level") || text.includes("medior")) {
+    return "MEDIOR";
+  }
+
+  return null;
+}
+
+function inferExperience(description) {
+  const text = stripHtml(description).toLowerCase();
+
+  const rangeMatch = text.match(/(\d+)\s*-\s*(\d+)\s*(?:years?|év)/);
+
+  if (rangeMatch) {
+    return {
+      min: Number(rangeMatch[1]),
+      max: Number(rangeMatch[2]),
+    };
+  }
+
+  const minimumMatch = text.match(
+    /(?:minimum|min\.?|at least|legalább)\s*(\d+)\+?\s*(?:years?|év)/
+  );
+
+  if (minimumMatch) {
+    return {
+      min: Number(minimumMatch[1]),
+      max: null,
+    };
+  }
+
+  const simpleMatch = text.match(/(\d+)\+?\s*(?:years?|év)(?:\s+of)?\s+(?:professional\s+)?experience/);
+
+  if (simpleMatch) {
+    return {
+      min: Number(simpleMatch[1]),
+      max: null,
+    };
+  }
+
+  return {
+    min: null,
+    max: null,
+  };
+}
+
+function inferRoleType(title) {
+  const text = title.toLowerCase();
+
+  if (text.includes("full-stack") || text.includes("full stack") || text.includes("fullstack")) {
+    return "FULL_STACK";
+  }
+
+  if (text.includes("frontend") || text.includes("front-end") || text.includes("front end")) {
+    return "FRONTEND";
+  }
+
+  if (text.includes("backend") || text.includes("back-end") || text.includes("back end")) {
+    return "BACKEND";
+  }
+
+  return null;
+}
+
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -93,24 +182,27 @@ function mapJoobleJob(job) {
 
 function mapCareerjetJob(job) {
   const url = normalizeText(job.url);
+  const title = normalizeText(job.title);
+  const description = normalizeText(job.description);
+  const experience = inferExperience(description);
 
   return {
     source: "careerjet",
-    externalId: url || null,
-    title: normalizeText(job.title) || "Ismeretlen pozíció",
+    externalId: normalizeText(job.url) || null,
+    title: title || "Ismeretlen pozíció",
     company: normalizeText(job.company) || null,
     location: normalizeText(job.locations) || null,
-    description: normalizeText(job.description) || null,
-    url,
+    description: description || null,
+    url: normalizeText(job.url),
     publishedAt: parsePublishedAt(job.date),
-    experienceMin: null,
-    experienceMax: null,
-    seniority: null,
-    roleType: null,
+    experienceMin: experience.min,
+    experienceMax: experience.max,
+    seniority: inferSeniority(title, description),
+    roleType: inferRoleType(title),
     remoteType: inferRemoteType({
-      title: job.title,
+      title,
       location: job.locations,
-      snippet: job.description,
+      snippet: description,
       type: null,
     }),
     rawData: job,

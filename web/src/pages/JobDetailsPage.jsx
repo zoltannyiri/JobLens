@@ -29,6 +29,8 @@ function JobDetailsPage() {
   const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  const hasDetails = job.experienceMin !== null || job.experienceMax !== null || Boolean(job.remoteType) || Boolean(job.roleType) || Boolean(job.seniority);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -355,6 +357,7 @@ function JobDetailsPage() {
               </h2>
 
               <dl className="mt-5 space-y-4 text-sm">
+                {job.experienceMin !== null  && (
                 <div>
                   <dt className="text-slate-500">
                     Minimum tapasztalat
@@ -366,7 +369,9 @@ function JobDetailsPage() {
                       : "Nincs megadva"}
                   </dd>
                 </div>
+                )}
 
+                {job.experienceMax !== null && (
                 <div>
                   <dt className="text-slate-500">
                     Maximum tapasztalat
@@ -378,7 +383,9 @@ function JobDetailsPage() {
                       : "Nincs megadva"}
                   </dd>
                 </div>
-
+                )}
+                
+                {job.roleType && (
                 <div>
                   <dt className="text-slate-500">
                     Munkavégzés
@@ -388,6 +395,7 @@ function JobDetailsPage() {
                     {job.remoteType || "Nincs megadva"}
                   </dd>
                 </div>
+                )}
               </dl>
 
               <button
