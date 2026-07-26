@@ -29,7 +29,7 @@ function JobDetailsPage() {
   const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const hasDetails = job.experienceMin !== null || job.experienceMax !== null || Boolean(job.remoteType) || Boolean(job.roleType) || Boolean(job.seniority);
+  const hasDetails = job?.experienceMin !== null || job?.experienceMax !== null || Boolean(job?.remoteType) || Boolean(job?.roleType) || Boolean(job?.seniority);
 
   useEffect(() => {
     let isMounted = true;

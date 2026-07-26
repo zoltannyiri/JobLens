@@ -42,7 +42,7 @@ async function searchCareerjetJobs({
       page_size: pageSize,
       user_ip: userIp,
       sort: "date", 
-      fragment_size: 500,
+      fragment_size: 50000,
       user_agent: userAgent,
     },
 

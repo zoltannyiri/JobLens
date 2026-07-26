@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const crypto = require("crypto");
+const he = require("he");
 const { searchJoobleJobs } = require("../providers/jobble.provider");
 const { searchCareerjetJobs } = require("../providers/careerjet.provider");
 
@@ -40,7 +41,9 @@ function stripHtml(value) {
     return "";
   }
 
-  return value
+  const decodedValue = he.decode(value);
+
+  return decodedValue
     .replace(/<[^>]*>/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -216,7 +219,7 @@ function mapJoobleJob(job) {
 function mapCareerjetJob(job) {
   const url = normalizeText(job.url);
   const title = normalizeText(job.title) || "Ismeretlen pozíció";
-  const description = normalizeText(job.description);
+  const description = stripHtml(job.description);
   const experience = inferExperience(description);
 
   const jobData = {
