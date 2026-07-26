@@ -72,6 +72,7 @@ model Job {
   id          Int      @id @default(autoincrement())
   externalId  String?
   source      String
+  fingerprint String?  @unique
   title       String
   company     String?
   location    String?

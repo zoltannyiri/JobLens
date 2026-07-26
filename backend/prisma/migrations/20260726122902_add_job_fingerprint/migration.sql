@@ -1,0 +1,11 @@
+/*
+  Warnings:
+
+  - A unique constraint covering the columns `[fingerprint]` on the table `Job` will be added. If there are existing duplicate values, this will fail.
+
+*/
+-- AlterTable
+ALTER TABLE "Job" ADD COLUMN     "fingerprint" TEXT;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Job_fingerprint_key" ON "Job"("fingerprint");

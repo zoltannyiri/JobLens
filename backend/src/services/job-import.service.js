@@ -1,6 +1,39 @@
 const prisma = require("../config/prisma");
+const crypto = require("crypto");
 const { searchJoobleJobs } = require("../providers/jobble.provider");
 const { searchCareerjetJobs } = require("../providers/careerjet.provider");
+
+function normalizeFingerprintPart(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createJobFingerprint({
+  source,
+  title,
+  company,
+  location,
+}) {
+  const value = [
+    source,
+    title,
+    company,
+    location,
+  ]
+    .map(normalizeFingerprintPart)
+    .join("|");
+
+  return crypto
+    .createHash("sha256")
+    .update(value)
+    .digest("hex");
+}
 
 function stripHtml(value) {
   if (typeof value !== "string") {
@@ -182,13 +215,13 @@ function mapJoobleJob(job) {
 
 function mapCareerjetJob(job) {
   const url = normalizeText(job.url);
-  const title = normalizeText(job.title);
+  const title = normalizeText(job.title) || "Ismeretlen pozíció";
   const description = normalizeText(job.description);
   const experience = inferExperience(description);
 
-  return {
+  const jobData = {
     source: "careerjet",
-    externalId: normalizeText(job.url) || null,
+    externalId: null,
     title: title || "Ismeretlen pozíció",
     company: normalizeText(job.company) || null,
     location: normalizeText(job.locations) || null,
@@ -207,6 +240,10 @@ function mapCareerjetJob(job) {
     }),
     rawData: job,
   };
+
+  jobData.fingerprint = createJobFingerprint(jobData);
+
+  return jobData;
 }
 
 async function importCareerjetJobs({
@@ -293,48 +330,50 @@ async function upsertImportedJob(jobData) {
     };
   }
 
-  const existingJob = await prisma.job.findFirst({
+  if (!jobData.fingerprint) {
+    return {
+      status: "skipped",
+      reason: "missing_fingerprint",
+    };
+  }
+
+  const existingJob = await prisma.job.findUnique({
     where: {
-      OR: [
-        {
-          source: jobData.source,
-          url: jobData.url,
-        },
-        ...(jobData.existingId
-          ? [
-            {
-              source: jobData.source,
-              externalId: jobData.externalId,
-            },
-          ]
-        : []),
-      ],
+      fingerprint: jobData.fingerprint,
     },
     select: {
       id: true,
     },
   });
 
-  if (existingJob) {
-    const job = await prisma.job.update({
-      where: {
-        id: existingJob.id,
-      },
-      data: jobData,
-    });
-
-    return {
-      status: "updated",
-      job,
-    };
-  }
-
-  const job = await prisma.job.create({
-    data: jobData,
+  const job = await prisma.job.upsert({
+    where: {
+      fingerprint: jobData.fingerprint,
+    },
+    update: jobData,
+    create: jobData,
   });
 
+  // if (existingJob) {
+  //   const job = await prisma.job.update({
+  //     where: {
+  //       id: existingJob.id,
+  //     },
+  //     data: jobData,
+  //   });
+
+  //   return {
+  //     status: "updated",
+  //     job,
+  //   };
+  // }
+
+  // const job = await prisma.job.create({
+  //   data: jobData,
+  // });
+
   return {
-    status: "created",
+    status: existingJob ? "updated" : "created",
     job,
   };
 }
