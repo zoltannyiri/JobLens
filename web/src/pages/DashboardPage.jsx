@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getJobsRequest } from "../api/jobsApi";
 import { getSearchProfileRequest } from "../api/searchProfileApi";
 import { getSavedJobsRequest } from "../api/savedJobsApi";
+import { importCareerjetJobsRequest } from "../api/jobImportApi";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -19,6 +20,9 @@ function DashboardPage() {
   const [savedJobCount, setSavedJobCount] = useState(0);
   const [isSavedJobsLoading, setIsSavedJobsLoading] = useState(true);
   const [savedJobsError, setSavedJobsError] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+  const [importError, setImportError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -110,6 +114,38 @@ function DashboardPage() {
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Kijelentkezési hiba:", error);
+    }
+  }
+
+  async function handleCareerjetImport() {
+    setIsImporting(true);
+    setImportMessage("");
+    setImportError("");
+
+    try {
+      const result = await importCareerjetJobsRequest({
+        keywords: searchProfile?.positionTitle || "",
+        location: searchProfile?.locations?.[0] || "",
+        page: 1,
+        pageSize: 20,
+      });
+
+      setImportMessage(
+        `Import kész: ${result.statistics.created} új, ` + `${result.statistics.updated} frissített, ` + `${result.statistics.skipped} kihagyott állás.`
+      );
+
+      const jobsResult = await getJobsRequest({
+        page: 1,
+        limit: 1,
+      });
+
+      setJobCount(jobsResult.pagination.total);
+    } catch (error) {
+      setImportError(
+        error.response?.data?.message || "Nem sikerült importálni a Careerjet állásokat."
+      );
+    } finally {
+      setIsImporting(false);
     }
   }
 
@@ -338,6 +374,61 @@ function DashboardPage() {
                 : "Profil létrehozása"}
             </Link>
           </div>
+        </section>
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-bold tracking-[0.18em] text-blue-600 uppercase">
+                Careerjet import
+              </p>
+
+              <h2 className="mt-2 text-xl font-black text-slate-950">
+                Új álláshirdetések lekérése
+              </h2>
+
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                A keresési profil pozíciója és első helyszíne alapján
+                lekéri a Careerjet legfrissebb állásait.
+              </p>
+
+              {searchProfile && (
+                <p className="mt-3 text-sm font-semibold text-slate-700">
+                  Keresés: {searchProfile.positionTitle || "nincs pozíció"}
+                  {" · "}
+                  {searchProfile.locations?.[0] || "nincs helyszín"}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCareerjetImport}
+              disabled={isImporting || !searchProfile}
+              className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isImporting
+                ? "Állások lekérése..."
+                : "Állások frissítése"}
+            </button>
+          </div>
+
+          {!searchProfile && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+              Előbb hozz létre keresési profilt.
+            </div>
+          )}
+
+          {importMessage && (
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              {importMessage}
+            </div>
+          )}
+
+          {importError && (
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              {importError}
+            </div>
+          )}
         </section>
       </section>
     </main>
