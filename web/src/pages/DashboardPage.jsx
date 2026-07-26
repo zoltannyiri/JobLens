@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getJobsRequest } from "../api/jobsApi";
 import { getSearchProfileRequest } from "../api/searchProfileApi";
 import { getSavedJobsRequest } from "../api/savedJobsApi";
-import { importCareerjetJobsRequest } from "../api/jobImportApi";
+import { importCareerjetJobsRequest, importJoobleJobsRequest } from "../api/jobImportApi";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -23,6 +23,8 @@ function DashboardPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importError, setImportError] = useState("");
+  const [isJoobleImporting, setIsJoobleImporting] = useState(false);
+  const [joobleImportMessage, setJoobleImportMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -114,6 +116,37 @@ function DashboardPage() {
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Kijelentkezési hiba:", error);
+    }
+  }
+
+  async function handleJoobleImport() {
+    if (!searchProfile?.positionTitle) {
+      setJoobleImportMessage("Előbb hozz létre keresési profilt.");
+      
+      return;
+    }
+
+    setIsJoobleImporting(true);
+    setJoobleImportMessage("");
+
+    try {
+      const location = searchProfile.locations?.[0] || "Magyarország";
+
+      const result = await importJoobleJobsRequest({
+        keywords: searchProfile.positionTitle,
+        location,
+        startPage: 1,
+        maxPages: 3,
+        resultOnPage: 20,
+      });
+
+      setJoobleImportMessage(
+        `Jooble import kész: ${result.statistics.created} új, ` + `${result.statistics.updated} frissített állás`
+      );
+    } catch (error) {
+      setJoobleImportMessage(error.response?.data?.message || "A jooble import nem sikerült.");
+    } finally {
+      setIsJoobleImporting(false);
     }
   }
 
@@ -427,6 +460,55 @@ function DashboardPage() {
           {importError && (
             <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {importError}
+            </div>
+          )}
+        </section>
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-bold tracking-[0.18em] text-violet-600 uppercase">
+                Jooble import
+              </p>
+
+              <h2 className="mt-2 text-xl font-black text-slate-950">
+                Jooble álláshirdetések lekérése
+              </h2>
+
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                A keresési profil pozíciója és első helyszíne alapján
+                lekéri a Jooble legfrissebb állásait.
+              </p>
+
+              {searchProfile && (
+                <p className="mt-3 text-sm font-semibold text-slate-700">
+                  Keresés: {searchProfile.positionTitle || "nincs pozíció"}
+                  {" · "}
+                  {searchProfile.locations?.[0] || "nincs helyszín"}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleJoobleImport}
+              disabled={isJoobleImporting || !searchProfile}
+              className="shrink-0 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isJoobleImporting
+                ? "Jooble állások lekérése..."
+                : "Jooble állások frissítése"}
+            </button>
+          </div>
+
+          {!searchProfile && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+              Előbb hozz létre keresési profilt.
+            </div>
+          )}
+
+          {joobleImportMessage && (
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              {joobleImportMessage}
             </div>
           )}
         </section>
