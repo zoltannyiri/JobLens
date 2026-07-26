@@ -7,5 +7,6 @@ router.use(authenticate);
 
 router.post("/jooble", jobImportController.importJoobleJobs);
 router.post("/careerjet", jobImportController.importCareerjetJobs);
+router.post("/careerjet/pages", jobImportController.importCareerjetJobPages);
 
 module.exports = router;

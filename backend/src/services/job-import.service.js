@@ -324,6 +324,73 @@ async function importCareerjetJobs({
   };
 }
 
+async function importCareerjetJobPages({
+  keywords,
+  location = "Magyarország",
+  startPage = 1,
+  maxPages = 3,
+  pageSize = 20,
+  userIp,
+  userAgent,
+}) {
+  const normalizedStartPage = Math.max(Number(startPage) || 1,  1);
+
+  const normalizedMaxPages = Math.min(Math.max(Number(maxPages) || 1, 1), 10);
+
+  const totalStatistics = {
+    received: 0,
+    accepted: 0,
+    skipped: 0,
+    updated: 0,
+    created: 0,
+  };
+
+  const importedJobs = [];
+
+  let sourceTotal = 0;
+  let sourcePages = 0;
+  let processedPages = 0;
+
+  for (let page = normalizedStartPage; page < normalizedStartPage + normalizedMaxPages; page++) {
+    const result = await importCareerjetJobs({
+      keywords,
+      location,
+      page,
+      pageSize,
+      userIp,
+      userAgent,
+    });
+
+    sourceTotal = result.sourceTotal;
+    sourcePages = result.pages;
+
+    totalStatistics.receiver += result.statistics.received;
+    totalStatistics.accepted += result.statistics.accepted;
+    totalStatistics.skipped += result.statistics.skipped;
+    totalStatistics.updated += result.statistics.updated;
+    totalStatistics.created += result.statistics.created;
+
+    importedJobs.push(...result.jobs);
+    processedPages += 1;
+
+    const reachedLastPage = sourcePages > 0 && page >= sourcePages;
+
+    const receivedNoJobs = result.statistics.received === 0;
+
+    if (reachedLastPage || receivedNoJobs) {
+      break;
+    }
+  }
+
+  return {
+    sourceTotal,
+    sourcePages,
+    processedPages,
+    statistics: totalStatistics,
+    jobs: importedJobs,
+  }
+}
+
 async function upsertImportedJob(jobData) {
   if (!jobData.url) {
     return {
@@ -437,4 +504,5 @@ async function importJoobleJobs({
 module.exports = {
   importJoobleJobs,
   importCareerjetJobs,
+  importCareerjetJobPages,
 };

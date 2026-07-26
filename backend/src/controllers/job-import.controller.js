@@ -64,6 +64,57 @@ async function importCareerjetJobs(req, res, next) {
   }
 }
 
+async function importCareerjetJobPages(req, res, next) {
+  try {
+    const {
+      keywords,
+      location = "Magyarország",
+      startPage = 1,
+      pageSize = 20,
+      maxPages = 3,
+    } = req.body;
+
+    if (typeof keywords !== "string" || !keywords.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "A keresési kulcsszó kötelező.",
+      });
+    }
+
+    const userIp = getRequestIp(req);
+
+    const userAgent = req.get("user-agent") || "Joblens/1.0";
+
+    const result = await jobImportService.importCareerjetJobPages({
+      keywords: keywords.trim(),
+      location: typeof location === "string" ? location.trim() : "Magyarország",
+      startPage: Math.max(Number(startPage) || 1, 1),
+      maxPages: Math.min(Math.max(Number(maxPages) || 3, 1), 10),
+      pageSize: Math.min(Math.max(Number(pageSize) || 20, 1), 100),
+      userIp,
+      userAgent,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "A többoldalas Careerjet import befejeződött.",
+      data: result,
+    });
+  } catch (error) {
+    if (error.response) {
+      return res
+        .status(error.response.status || 502)
+        .json({
+          success: false,
+          message: "A Careerjet API nem adott megfelelő választ.",
+          details: error.response.data || null,
+        });
+    }
+
+    next(error);
+  }
+}
+
 async function importJoobleJobs(req, res, next) {
   try {
     const {
@@ -118,4 +169,5 @@ async function importJoobleJobs(req, res, next) {
 module.exports = {
   importJoobleJobs,
   importCareerjetJobs,
+  importCareerjetJobPages,
 };
