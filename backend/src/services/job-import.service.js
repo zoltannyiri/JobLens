@@ -16,18 +16,15 @@ function normalizeFingerprintPart(value) {
 
 function createJobFingerprint({
   source,
+  externalId,
   title,
   company,
   location,
 }) {
-  const value = [
-    source,
-    title,
-    company,
-    location,
-  ]
+  const parts = source === "jooble" && externalId ? [source, externalId] : [source, title, company, location];
+  const value = parts
     .map(normalizeFingerprintPart)
-    .join("|");
+    .join("|"); 
 
   return crypto
     .createHash("sha256")
@@ -51,7 +48,7 @@ function stripHtml(value) {
 function inferSeniority(title, description) {
   const text = `${title} ${description}`.toLowerCase();
 
-  if (text.includes("intern") || text.includes("gyakornok") || text.includes("trainee")) {
+  if (/\bintern(ship)?\b/.test(text) || text.includes("gyakornok") || /\btrainee\b/.test(text)) {
     return "INTERN";
   }
 
@@ -195,24 +192,63 @@ function isHungarianJob(job) {
 }
 
 function mapJoobleJob(job) {
-  const externalId = job.id !== undefined && job.id !== null ? String(job.id) : null;
+  const externalId = getJoobleExternalId(job);
+  const title = normalizeText(job.title) || "Ismeretlen pozíció";
+  const description = stripHtml(job.snippet);
+  const experience = inferExperience(description);
 
-  return {
+  const jobData = {
     source: "jooble",
     externalId,
     title: normalizeText(job.title) || "Ismeretlen pozíció",
     company: normalizeText(job.company) || null,
     location: normalizeText(job.location) || null,
-    description: normalizeText(job.snippet) || null,
+    description: description || null,
     url: normalizeText(job.link),
     publishedAt: parsePublishedAt(job.updated),
-    experienceMin: null,
-    experienceMax: null,
-    seniority: null,
-    roleType: null,
-    remoteType: inferRemoteType(job),
+    experienceMin: experience.min,
+    experienceMax: experience.max,
+    seniority: inferSeniority(title, description),
+    roleType: inferRoleType(title),
+    remoteType: inferRemoteType({
+      title,
+      location: job.location,
+      snippet: description,
+      type: null,
+    }),
     rawData: job,
   };
+
+  jobData.fingerprint = createJobFingerprint(jobData);
+
+  return jobData;
+}
+
+function getJoobleExternalId(job) {
+  const link = String(job.ling || "");
+  const match = link.match(/\/(?:jpd|desc)\/(-?\d+)/);
+
+  if (match) {
+    return match[1];
+  }
+
+  if (job.id !== undefined && job.id !== null) {
+    return String(job.id);
+  }
+
+  return null;
+}
+
+function normalizeJoobleLocation(location) {
+  const normalized = String(location || "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "magyarország" || normalized === "magyarorszag") {
+    return "Hungary";
+  }
+
+  return location;
 }
 
 function mapCareerjetJob(job) {
@@ -364,7 +400,7 @@ async function importCareerjetJobPages({
     sourceTotal = result.sourceTotal;
     sourcePages = result.pages;
 
-    totalStatistics.receiver += result.statistics.received;
+    totalStatistics.received += result.statistics.received;
     totalStatistics.accepted += result.statistics.accepted;
     totalStatistics.skipped += result.statistics.skipped;
     totalStatistics.updated += result.statistics.updated;
@@ -455,7 +491,7 @@ async function importJoobleJobs({
 }) {
   const joobleResponse = await searchJoobleJobs({
     keywords,
-    location,
+    location: normalizeJoobleLocation(location),
     page,
     resultOnPage,
   });
@@ -501,8 +537,72 @@ async function importJoobleJobs({
   };
 }
 
+async function importJoobleJobPages({
+  keywords,
+  location = "Magyarország",
+  startPage = 1,
+  maxPages = 3,
+  resultOnPage = 20,
+}) {
+  const normalizedStartPage = Math.max(Number(startPage) || 1,  1);
+  const normalizedMaxPages = Math.min(Math.max(Number(maxPages) || 1, 1), 10);
+  const normalizedResultOnPage = Math.min(Math.max(Number(resultOnPage) || 20, 1), 50);
+  const totalStatistics = {
+    received: 0,
+    accepted: 0,
+    skipped: 0,
+    updated: 0,
+    created: 0,
+  };
+
+  const importedJobs = [];
+
+  let sourceTotal = 0;
+  let processedPages = 0;
+  let sourcePages = 0;
+
+  for (let page = normalizedStartPage; page < normalizedStartPage + normalizedMaxPages; page++) {
+    const result = await importJoobleJobs({
+      keywords, 
+      location, 
+      page, 
+      resultOnPage: normalizedResultOnPage,
+    })
+
+    sourceTotal = Number(result.sourceTotal) || 0;
+
+    sourcePages = sourceTotal > 0 ? Math.ceil(sourceTotal / normalizedResultOnPage) : 0;
+
+    totalStatistics.received += result.statistics.received;
+    totalStatistics.accepted += result.statistics.accepted;
+    totalStatistics.skipped += result.statistics.skipped;
+    totalStatistics.updated += result.statistics.updated;
+    totalStatistics.created += result.statistics.created;
+
+    importedJobs.push(...result.jobs);
+
+    processedPages += 1;
+
+    const reachedLastPage = sourcePages > 0 && page >= sourcePages;
+    const receivedNoJobs = result.statistics.received === 0;
+
+    if (reachedLastPage || receivedNoJobs) {
+      break;
+    }
+  }
+
+  return {
+    sourceTotal,
+    sourcePages,
+    processedPages,
+    statistics: totalStatistics,
+    jobs: importedJobs,
+  };
+}
+
 module.exports = {
   importJoobleJobs,
   importCareerjetJobs,
   importCareerjetJobPages,
+  importJoobleJobPages,
 };
