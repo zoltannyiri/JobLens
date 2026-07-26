@@ -5,14 +5,13 @@ const { searchJoobleJobs } = require("../providers/jobble.provider");
 const { searchCareerjetJobs } = require("../providers/careerjet.provider");
 
 function normalizeFingerprintPart(value) {
-  return String(value || "")
+  return stripHtml(value)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function createJobFingerprint({
@@ -128,7 +127,7 @@ function inferRoleType(title) {
 }
 
 function normalizeText(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return stripHtml(value);
 }
 
 function parsePublishedAt(value) {
