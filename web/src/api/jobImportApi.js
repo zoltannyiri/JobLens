@@ -12,3 +12,9 @@ export async function importJoobleJobsRequest(payload) {
 
   return response.data.data;
 }
+
+export async function importProfessionJobsRequest(payload) {
+  const response = await apiClient.post("/job-import/profession", payload);
+
+  return response.data.data;
+}

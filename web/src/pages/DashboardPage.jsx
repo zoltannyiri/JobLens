@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getJobsRequest } from "../api/jobsApi";
 import { getSearchProfileRequest } from "../api/searchProfileApi";
 import { getSavedJobsRequest } from "../api/savedJobsApi";
-import { importCareerjetJobsRequest, importJoobleJobsRequest } from "../api/jobImportApi";
+import { importCareerjetJobsRequest, importJoobleJobsRequest, importProfessionJobsRequest } from "../api/jobImportApi";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -25,6 +25,9 @@ function DashboardPage() {
   const [importError, setImportError] = useState("");
   const [isJoobleImporting, setIsJoobleImporting] = useState(false);
   const [joobleImportMessage, setJoobleImportMessage] = useState("");
+  const [isProfessionImporting, setIsProfessionImporting] = useState(false);
+  const [professionImportMessage, setProfessionImportMessage] = useState("");
+  const [professionImportError, setProfessionImportError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -116,6 +119,39 @@ function DashboardPage() {
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Kijelentkezési hiba:", error);
+    }
+  }
+
+  async function handleProfessionImport() {
+    if (!searchProfile?.positionTitle) {
+      setProfessionImportError("Előbb hozz létre keresési profilt.")
+
+      return;
+    }
+
+    setIsProfessionImporting(true);
+    setProfessionImportMessage("");
+    setProfessionImportError("");
+
+    try {
+      const result = await importProfessionJobsRequest({
+        keywords: searchProfile.positionTitle,
+      });
+
+      setProfessionImportMessage(`Profession import kész: ${result.statistics.created} új, ` + `${result.statistics.updated} frissített, ` + `${result.statistics.skipped} kihagyott állás.`);
+
+      const jobsResult = await getJobsRequest({
+        page: 1,
+        limit: 1,
+      });
+
+      setJobCount(jobsResult.pagination.total);
+    } catch (error) {
+      setProfessionImportError(
+        error.response?.data?.message || "Nem sikerült importálni a Profession állásokat."
+      );
+    } finally {
+      setIsProfessionImporting(false);
     }
   }
 
@@ -509,6 +545,60 @@ function DashboardPage() {
           {joobleImportMessage && (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
               {joobleImportMessage}
+            </div>
+          )}
+        </section>
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-bold tracking-[0.18em] text-emerald-600 uppercase">
+                Profession import
+              </p>
+
+              <h2 className="mt-2 text-xl font-black text-slate-950">
+                Profession álláshirdetések lekérése
+              </h2>
+
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                A keresési profilban megadott pozíció alapján lekéri a
+                Profession releváns álláshirdetéseit.
+              </p>
+
+              {searchProfile && (
+                <p className="mt-3 text-sm font-semibold text-slate-700">
+                  Keresés:{" "}
+                  {searchProfile.positionTitle || "nincs pozíció"}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleProfessionImport}
+              disabled={isProfessionImporting || !searchProfile}
+              className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isProfessionImporting
+                ? "Profession állások lekérése..."
+                : "Profession állások frissítése"}
+            </button>
+          </div>
+
+          {!searchProfile && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+              Előbb hozz létre keresési profilt.
+            </div>
+          )}
+
+          {professionImportMessage && (
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              {professionImportMessage}
+            </div>
+          )}
+
+          {professionImportError && (
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              {professionImportError}
             </div>
           )}
         </section>
