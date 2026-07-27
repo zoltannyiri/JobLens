@@ -12,6 +12,41 @@ function getRequestIp(req) {
   );
 }
 
+async function importProfessionJobs(req, res, next) {
+  try {
+    const { keywords } = req.body;
+
+    if (typeof keywords !== "string" || !keywords.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "A keresési kulcsszó kötelező.",
+      });
+    }
+
+    const result = await jobImportService.importProfessionJobs({
+      keywords: keywords.trim(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "A Profession állások importálása befejeződött.",
+      data: result,
+    });
+  } catch (error) {
+    if (error.response) {
+      return res
+        .status(error.response.status || 502)
+        .json({
+          success: false,
+          message: "A Profession oldal nem adott megfelelő választ.",
+          details: null,
+        });
+      }
+
+      next(error);
+    }
+  }
+
 async function importJoobleJobPages(req, res, next) {
   try {
     const {
@@ -215,4 +250,5 @@ module.exports = {
   importCareerjetJobs,
   importCareerjetJobPages,
   importJoobleJobPages,
+  importProfessionJobs,
 };

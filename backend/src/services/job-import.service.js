@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const he = require("he");
 const { searchJoobleJobs } = require("../providers/jobble.provider");
 const { searchCareerjetJobs } = require("../providers/careerjet.provider");
+const { searchProfessionJobs } = require("../providers/profession.provider");
 
 function normalizeFingerprintPart(value) {
   return stripHtml(value)
@@ -21,7 +22,7 @@ function createJobFingerprint({
   company,
   location,
 }) {
-  const parts = source === "jooble" && externalId ? [source, externalId] : [source, title, company, location];
+  const parts = externalId ? [source, externalId] : [source, title, company, location];
   const value = parts
     .map(normalizeFingerprintPart)
     .join("|"); 
@@ -225,8 +226,8 @@ function mapJoobleJob(job) {
 }
 
 function getJoobleExternalId(job) {
-  const link = String(job.ling || "");
-  const match = link.match(/\/(?:jpd|desc)\/(-?\d+)/);
+  const link = String(job.link || "");
+  const match = link.match(/\/(?:jdp|desc)\/(-?\d+)/);
 
   if (match) {
     return match[1];
@@ -442,44 +443,118 @@ async function upsertImportedJob(jobData) {
     };
   }
 
-  const existingJob = await prisma.job.findUnique({
-    where: {
-      fingerprint: jobData.fingerprint,
-    },
-    select: {
-      id: true,
-    },
+  let existingJob = null;
+
+  if (jobData.externalId) {
+    existingJob = await prisma.job.findFirst({
+      where: {
+        source: jobData.source,
+        externalId: jobData.externalId,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  if (!existingJob) {
+    existingJob = await prisma.job.findUnique({
+      where: {
+        fingerprint: jobData.fingerprint,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  if (existingJob) {
+    const job = await prisma.job.update({
+      where: {
+        id: existingJob.id,
+      },
+      data: jobData,
+    });
+
+    return {
+      status: "updated",
+      job,
+    };
+  }
+
+  const createdJob = await prisma.job.create({
+    data: jobData,
   });
-
-  const job = await prisma.job.upsert({
-    where: {
-      fingerprint: jobData.fingerprint,
-    },
-    update: jobData,
-    create: jobData,
-  });
-
-  // if (existingJob) {
-  //   const job = await prisma.job.update({
-  //     where: {
-  //       id: existingJob.id,
-  //     },
-  //     data: jobData,
-  //   });
-
-  //   return {
-  //     status: "updated",
-  //     job,
-  //   };
-  // }
-
-  // const job = await prisma.job.create({
-  //   data: jobData,
-  // });
 
   return {
-    status: existingJob ? "updated" : "created",
-    job,
+    status: "created",
+    job: createdJob,
+  };
+}
+
+async function importProfessionJobs({ keywords }) {
+  const professionResponse = await searchProfessionJobs({ keywords });
+
+  const statistics = {
+    received: professionResponse.jobs.length,
+    accepted: 0,
+    skipped: 0,
+    updated: 0,
+    created: 0,
+  };
+
+  const importedJobs = [];
+
+  for (const sourceJob of professionResponse.jobs) {
+    const jobData = {
+      source: "profession",
+      externalId: sourceJob.externalId,
+      title: normalizeText(sourceJob.title) || "Ismeretlen pozíció",
+      company: normalizeText(sourceJob.company) || null,
+      location: normalizeText(sourceJob.location) || null,
+      description: normalizeText(sourceJob.description) || null,
+      url: sourceJob.url,
+      publishedAt: null,
+      experienceMin: null,
+      experienceMax: null,
+      seniority: inferSeniority(sourceJob.title, ""),
+      roleType: inferRoleType(sourceJob.title),
+      remoteType: inferRemoteType({
+        title: sourceJob.title,
+        location: sourceJob.location,
+        snippet: sourceJob.description,
+        type: null,
+      }),
+      rawData: sourceJob,
+    };
+
+    jobData.fingerprint = createJobFingerprint(jobData);
+
+    if (!jobData.url) {
+      statistics.skipped += 1;
+      continue;
+    }
+
+    statistics.accepted += 1;
+
+    const result = await upsertImportedJob(jobData);
+
+    if (result.status === "created") {
+      statistics.created += 1;
+    } else if (result.status === "updated") {
+      statistics.updated += 1;
+    } else {
+      statistics.skipped += 1;
+      continue;
+    }
+
+    importedJobs.push(result.job);
+  }
+
+  return {
+    searchUrl: professionResponse.searchUrl,
+    statistics,
+    jobs: importedJobs,
   };
 }
 
@@ -605,4 +680,5 @@ module.exports = {
   importCareerjetJobs,
   importCareerjetJobPages,
   importJoobleJobPages,
+  importProfessionJobs,
 };
